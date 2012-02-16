@@ -42,7 +42,6 @@ $GLOBALS['TL_DCA']['tl_iso_products'] = array
 		'dataContainer'				=> 'ProductData',
 		'enableVersioning'			=> true,
 		'closed'					=> true,
-		'gtable'					=> 'tl_iso_groups',
 		'ctable'					=> array('tl_iso_downloads', 'tl_iso_product_categories', 'tl_iso_prices'),
 		'onload_callback' => array
 		(
@@ -71,9 +70,8 @@ $GLOBALS['TL_DCA']['tl_iso_products'] = array
 			'fields'				=> array('name'),
 			'flag'					=> 1,
 			'panelLayout'			=> 'filter;sort,search,limit',
-			'icon'					=> 'system/modules/isotope/html/store-open.png',
+			'icon'					=> 'system/modules/isotope/html/icon-products.gif',
 			'paste_button_callback'	=> array('tl_iso_products', 'pasteProduct'),
-			'rootPaste'				=> true,
 		),
 		'label' => array
 		(
@@ -86,14 +84,14 @@ $GLOBALS['TL_DCA']['tl_iso_products'] = array
 			'new_product' => array
 			(
 				'label'				=> &$GLOBALS['TL_LANG']['tl_iso_products']['new_product'],
-				'href'				=> 'act=paste&mode=create&type=product',
+				'href'				=> 'act=create',
 				'class'				=> 'header_new',
 				'attributes'		=> 'onclick="Backend.getScrollOffset();"',
 			),
 			'new_variant' => array
 			(
 				'label'				=> &$GLOBALS['TL_LANG']['tl_iso_products']['new_variant'],
-				'href'				=> 'act=paste&mode=create&type=variant',
+				'href'				=> 'act=paste&mode=create',
 				'class'				=> 'header_new',
 				'attributes'		=> 'onclick="Backend.getScrollOffset();"',
 			),
@@ -164,27 +162,11 @@ $GLOBALS['TL_DCA']['tl_iso_products'] = array
 				'class'				=> 'header_edit_all isotope-tools',
 				'attributes'		=> 'onclick="Backend.getScrollOffset();"'
 			),
-			'toggleGroups' => array
-			(
-				'label'				=> &$GLOBALS['TL_LANG']['tl_iso_products']['toggleGroups'],
-				'href'				=> 'gtg=all',
-				'class'				=> 'header_toggle isotope-tools',
-				'attributes'		=> 'onclick="Backend.getScrollOffset();"',
-				'button_callback'	=> array('tl_iso_products', 'toggleGroups')
-			),
 			'toggleVariants' => array
 			(
 				'label'				=> &$GLOBALS['TL_LANG']['tl_iso_products']['toggleVariants'],
 				'href'				=> 'ptg=all',
 				'class'				=> 'header_toggle isotope-tools',
-				'attributes'		=> 'onclick="Backend.getScrollOffset();"',
-				'button_callback'	=> array('tl_iso_products', 'toggleVariants')
-			),
-			'groups' => array
-			(
-				'label'				=> &$GLOBALS['TL_LANG']['tl_iso_products']['groups'],
-				'href'				=> 'table=tl_iso_groups',
-				'class'				=> 'header_iso_groups isotope-tools',
 				'attributes'		=> 'onclick="Backend.getScrollOffset();"',
 			),
 			'import' => array
@@ -209,13 +191,7 @@ $GLOBALS['TL_DCA']['tl_iso_products'] = array
 				'href'				=> 'act=paste&amp;mode=copy&amp;childs=1',
 				'icon'				=> 'copy.gif',
 				'attributes'		=> 'onclick="Backend.getScrollOffset();"',
-			),
-			'cut' => array
-			(
-				'label'				=> &$GLOBALS['TL_LANG']['tl_iso_products']['copy'],
-				'href'				=> 'act=paste&amp;mode=cut',
-				'icon'				=> 'cut.gif',
-				'attributes'		=> 'onclick="Backend.getScrollOffset();"',
+				'button_callback'	=> array('tl_iso_products', 'copyProduct')
 			),
 			'delete' => array
 			(
@@ -1719,30 +1695,6 @@ $strBuffer .= '<th style="text-align:center"><img src="system/themes/default/ima
 	}
 	
 	
-	/**
-	 * Hide "toggle all groups" button if there are no groups at all
-	 * @param string
-	 * @param string
-	 * @param string
-	 * @param string
-	 * @param string
-	 * @param string
-	 * @param array
-	 * @return string
-	 */
-	public function toggleGroups($href, $label, $title, $class, $attributes, $table, $root)
-	{
-		$objGroups = $this->Database->query("SELECT COUNT(id) AS hasGroups FROM tl_iso_groups");
-		
-		if (!$objGroups->hasGroups)
-		{
-			return '';
-		}
-		
-		return '<a href="' . $this->addToUrl('&amp;' . $href) . '" class="header_toggle isotope-tools" title="' . specialchars($title) . '"' . $attributes . '>' . specialchars($label) . '</a>';
-	}	
-
-
 	/**
 	 * Return the "toggle visibility" button
 	 * @param array

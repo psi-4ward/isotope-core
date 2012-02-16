@@ -42,19 +42,13 @@ class ProductTree extends Widget
 	 * Path nodes
 	 * @var array
 	 */
-	protected $arrNodes = array('products'=>array(), 'groups'=>array());
+	protected $arrNodes = array();
 
 	/**
 	 * Template
 	 * @var string
 	 */
 	protected $strTemplate = 'be_widget';
-
-	/**
-	 * Allowed product types
-	 * @var array
-	 */
-	protected $arrTypes;
 
 	/**
 	 * dca object to render rows
@@ -92,15 +86,8 @@ class ProductTree extends Widget
 		$this->loadDataContainer('tl_iso_products');
 		$this->loadLanguageFile('tl_iso_products');
 
-		$this->loadDataContainer('tl_iso_groups');
-		$this->loadLanguageFile('tl_iso_groups');
-
 		$this->import('Database');
-		$this->import('BackendUser', 'User');
-		$this->import('tl_iso_products');
-		$this->import('tl_iso_groups');
-
-		$this->arrTypes = is_array($this->User->iso_product_types) ? $this->User->iso_product_types : array(0);
+		$this->import('tl_iso_products', 'dca');
 	}
 
 
@@ -166,8 +153,10 @@ class ProductTree extends Widget
 	 */
 	public function generate()
 	{
-		$GLOBALS['TL_JAVASCRIPT'][] = 'system/modules/isotope/html/backend.js';
-		$GLOBALS['TL_CSS'][] = 'system/modules/isotope/html/backend.css';
+		$GLOBALS['TL_JAVASCRIPT'][] = 'system/modules/isotope/html/backend_src.js';
+		$GLOBALS['TL_CSS'][] = 'system/modules/isotope/html/backend_src.css';
+
+		$this->import('BackendUser', 'User');
 
 		// Open the tree if there is an error
 		if ($this->hasErrors())
@@ -179,17 +168,12 @@ class ProductTree extends Widget
 		$this->getPathNodes();
 
 
-		$objGroups = $this->Database->execute("SELECT id FROM tl_iso_groups WHERE pid=0 ORDER BY sorting");
-		while( $objGroups->next() )
-		{
-			$tree .= $this->renderGroups($objGroups->id, -20);
-		}
+		$arrTypes = is_array($this->User->iso_product_types) ? $this->User->iso_product_types : array(0);
+		$objProduct = $this->Database->execute("SELECT id FROM tl_iso_products WHERE pid=0 AND language='' AND archive<2" . ($this->User->isAdmin ? '' : " AND type IN ('','" . implode("','", $arrTypes) . "')"));
 
-		$objProducts = $this->Database->execute("SELECT id FROM tl_iso_products WHERE pid=0 AND gid=0 AND language=''" . ($this->User->isAdmin ? '' : " AND type IN ('','" . implode("','", $this->arrTypes) . "')"));
-
-		while ($objProducts->next())
+		while ($objProduct->next())
 		{
-			$tree .= $this->renderProducts($objProducts->id, -20);
+			$tree .= $this->renderProductTree($objProduct->id, -20);
 		}
 
 		$strReset = '';
@@ -263,30 +247,11 @@ class ProductTree extends Widget
 		$tree = '';
 		$level = $level * 20;
 
-		if (strpos($this->Input->post('id'), 'groups') === false)
+		$objProducts = $this->Database->execute("SELECT id FROM tl_iso_products WHERE language='' AND archive<2 AND pid=".$id);
+
+		while ($objProducts->next())
 		{
-			$objProducts = $this->Database->prepare("SELECT id FROM tl_iso_products WHERE language='' AND pid=?".($this->User->isAdmin ? '' : " AND type IN ('','" . implode("','", $this->arrTypes) . "')")." ORDER BY name")->execute($id);
-
-			while ($objProducts->next())
-			{
-				$tree .= $this->renderProducts($objProducts->id, $level);
-			}
-		}
-		else
-		{
-			$objGroups = $this->Database->execute("SELECT id FROM tl_iso_groups WHERE pid=".$id." ORDER BY sorting");
-
-			while ($objGroups->next())
-			{
-				$tree .= $this->renderGroups($objGroups->id, $level);
-			}
-
-			$objProducts = $this->Database->prepare("SELECT id FROM tl_iso_products WHERE language='' AND gid=?".($this->User->isAdmin ? '' : " AND type IN ('','" . implode("','", $this->arrTypes) . "')")." ORDER BY name")->execute($id);
-
-			while ($objProducts->next())
-			{
-				$tree .= $this->renderProducts($objProducts->id, $level);
-			}
+			$tree .= $this->renderProductTree($objProducts->id, $level);
 		}
 
 		return $tree;
@@ -303,7 +268,7 @@ class ProductTree extends Widget
 	{
 		switch ($action)
 		{
-			// Toggle nodes of the product tree
+			// Toggle nodes of the file or page tree
 			case 'toggleProductTree':
 				$this->strAjaxId = preg_replace('/.*_([0-9a-zA-Z]+)$/i', '$1', $this->Input->post('id'));
 				$this->strAjaxKey = str_replace('_' . $this->strAjaxId, '', $this->Input->post('id'));
@@ -321,7 +286,7 @@ class ProductTree extends Widget
 				echo json_encode(array('token'=>REQUEST_TOKEN));
 				exit; break;
 
-			// Load nodes of the product tree
+			// Load nodes of the file or page tree
 			case 'loadProductTree':
 				$this->strAjaxId = preg_replace('/.*_([0-9a-zA-Z]+)$/i', '$1', $this->Input->post('id'));
 				$this->strAjaxKey = str_replace('_' . $this->strAjaxId, '', $this->Input->post('id'));
@@ -355,9 +320,6 @@ class ProductTree extends Widget
 			$arrData['id'] = strlen($this->strAjaxName) ? $this->strAjaxName : $dc->id;
 			$arrData['name'] = $this->Input->post('name');
 
-			$this->loadDataContainer($dc->table);
-			$arrData = array_merge($GLOBALS['TL_DCA'][$dc->table]['fields'][$arrData['name']]['eval'], $arrData);
-
 			$objWidget = new $GLOBALS['BE_FFL']['productTree']($arrData, $dc);
 
 			echo json_encode(array
@@ -371,117 +333,13 @@ class ProductTree extends Widget
 
 
 	/**
-	 * Recursively render product groups
-	 *
+	 * Recursively render the pagetree
 	 * @param int
 	 * @param integer
+	 * @param boolean
 	 * @return string
 	 */
-	protected function renderGroups($id, $intMargin)
-	{
-		static $session;
-		$session = $this->Session->getData();
-
-		$flag = substr($this->strField, 0, 2).'g';
-		$node = 'tree_' . $this->strTable . '_' . $this->strField . '_groups';
-		$xtnode = 'tree_' . $this->strTable . '_' . $this->strName . '_groups';
-
-		// Get session data and toggle nodes
-		if ($this->Input->get($flag.'tg'))
-		{
-			$session[$node][$this->Input->get($flag.'tg')] = (isset($session[$node][$this->Input->get($flag.'tg')]) && $session[$node][$this->Input->get($flag.'tg')] == 1) ? 0 : 1;
-			$this->Session->setData($session);
-
-			$this->redirect(preg_replace('/(&(amp;)?|\?)'.$flag.'tg=[^& ]*/i', '', $this->Environment->request));
-		}
-
-		$objGroup = $this->Database->execute("SELECT * FROM tl_iso_groups WHERE id=$id");
-
-		// Return if there is no result
-		if ($objGroup->numRows < 1)
-		{
-			return '';
-		}
-
-		$return = '';
-		$intSpacing = 20;
-		$products = array();
-
-		// Check whether there are child groups
-		$childs = $this->Database->prepare("SELECT id FROM tl_iso_groups WHERE pid=? ORDER BY sorting")
-								 ->execute($id)
-								 ->fetchEach('id');
-
-		// Check whether there are child products
-		$products = $this->Database->prepare("SELECT id FROM tl_iso_products WHERE gid=?".($this->User->isAdmin ? '' : " AND type IN ('','" . implode("','", $this->arrTypes) . "')")." ORDER BY name")
-								   ->execute($id)
-								   ->fetchEach('id');
-
-		if (!count($products) && !count($childs))
-		{
-			return '';
-		}
-
-		$return .= "\n    " . '<li class="tl_folder" onmouseover="Theme.hoverDiv(this, 1);" onmouseout="Theme.hoverDiv(this, 0);"><div class="tl_left" style="padding-left:'.($intMargin + $intSpacing).'px;">';
-
-		$folderAttribute = 'style="margin-left:20px;"';
-		$session[$node][$id] = is_numeric($session[$node][$id]) ? $session[$node][$id] : 0;
-		$level = ($intMargin / $intSpacing + 1);
-		$blnIsOpen = ($session[$node][$id] == 1 || in_array($id, $this->arrNodes['groups']));
-
-		if (count($childs) || count($products))
-		{
-			$folderAttribute = '';
-			$img = $blnIsOpen ? 'folMinus.gif' : 'folPlus.gif';
-			$alt = $blnIsOpen ? $GLOBALS['TL_LANG']['MSC']['collapseNode'] : $GLOBALS['TL_LANG']['MSC']['expandNode'];
-			$return .= '<a href="'.$this->addToUrl($flag.'tg='.$id).'" title="'.specialchars($alt).'" onclick="Backend.getScrollOffset(); return Isotope.toggleProductTree(this, \''.$xtnode.'_'.$id.'\', \''.$this->strField.'\', \''.$this->strName.'\', '.$level.');">'.$this->generateImage($img, '', 'style="margin-right:2px;"').'</a>';
-		}
-
-		$sub = 0;
-
-		// Add group name
-		$return .= $this->tl_iso_groups->addIcon($objGroup->row(), $objGroup->name).'</div><div style="clear:both;"></div></li>';
-
-		// Add child products
-		if ((count($products) || count($childs)) && $blnIsOpen)
-		{
-			$group = '';
-			$return .= '<li class="parent" id="'.$node.'_'.$id.'"><ul class="level_'.$level.'">';
-
-			if (count($products))
-			{
-				for ($k=0; $k<count($products); $k++)
-				{
-					$group .= $this->renderProducts($products[$k], ($intMargin + $intSpacing));
-				}
-			}
-
-			if (count($childs))
-			{
-				for ($k=0; $k<count($childs); $k++)
-				{
-					$group .= $this->renderGroups($childs[$k], ($intMargin + $intSpacing));
-				}
-			}
-
-			if ($group == '')
-				return '';
-
-			$return .= $group.'</ul></li>';
-		}
-
-		return $return;
-	}
-
-
-	/**
-	 * Recursively render the product tree
-	 *
-	 * @param int
-	 * @param integer
-	 * @return string
-	 */
-	protected function renderProducts($id, $intMargin)
+	protected function renderProductTree($id, $intMargin)
 	{
 		static $session;
 		$session = $this->Session->getData();
@@ -499,7 +357,7 @@ class ProductTree extends Widget
 			$this->redirect(preg_replace('/(&(amp;)?|\?)'.$flag.'tg=[^& ]*/i', '', $this->Environment->request));
 		}
 
-		$objProduct = $this->Database->prepare("SELECT * FROM tl_iso_products WHERE id=?".($this->User->isAdmin ? '' : " AND type IN ('','" . implode("','", $this->arrTypes) . "')"))->execute($id);
+		$objProduct = $this->Database->execute("SELECT * FROM tl_iso_products WHERE id=".$id);
 
 		// Return if there is no result
 		if ($objProduct->numRows < 1)
@@ -514,7 +372,7 @@ class ProductTree extends Widget
 		if ($this->variants)
 		{
 			// Check whether there are child records
-			$objNodes = $this->Database->prepare("SELECT id FROM tl_iso_products WHERE pid=? AND language=''")
+			$objNodes = $this->Database->prepare("SELECT id FROM tl_iso_products WHERE pid=? AND language='' AND archive<2")
 									   ->execute($id);
 
 			if ($objNodes->numRows)
@@ -528,7 +386,7 @@ class ProductTree extends Widget
 		$folderAttribute = 'style="margin-left:20px;"';
 		$session[$node][$id] = is_numeric($session[$node][$id]) ? $session[$node][$id] : 0;
 		$level = ($intMargin / $intSpacing + 1);
-		$blnIsOpen = ($session[$node][$id] == 1 || in_array($id, $this->arrNodes['products']));
+		$blnIsOpen = ($session[$node][$id] == 1 || in_array($id, $this->arrNodes));
 
 		if (count($childs))
 		{
@@ -541,7 +399,7 @@ class ProductTree extends Widget
 		$sub = 0;
 
 		// Add product name
-		$return .= $this->tl_iso_products->getRowLabel($objProduct->row()).'</div> <div class="tl_right">';
+		$return .= $this->dca->getRowLabel($objProduct->row()).'</div> <div class="tl_right">';
 
 		if (!count($childs) || $objProduct->pid > 0 || !$this->variantsOnly)
 		{
@@ -573,7 +431,7 @@ class ProductTree extends Widget
 
 			for ($k=0; $k<count($childs); $k++)
 			{
-				$return .= $this->renderProducts($childs[$k], ($intMargin + $intSpacing));
+				$return .= $this->renderProductTree($childs[$k], ($intMargin + $intSpacing));
 			}
 
 			$return .= '</ul></li>';
@@ -584,7 +442,7 @@ class ProductTree extends Widget
 
 
 	/**
-	 * Get the IDs of all parent products and groups of the selected product
+	 * Get the IDs of all parent products of the selected product
 	 */
 	protected function getPathNodes()
 	{
@@ -602,7 +460,7 @@ class ProductTree extends Widget
 		{
 			do
 			{
-				$objProduct = $this->Database->prepare("SELECT pid,gid FROM tl_iso_products WHERE id=?")
+				$objProduct = $this->Database->prepare("SELECT pid FROM tl_iso_products WHERE id=?")
 											 ->limit(1)
 											 ->execute($id);
 
@@ -612,7 +470,7 @@ class ProductTree extends Widget
 				}
 
 				// Path has been calculated already
-				if (in_array($objProduct->pid, $this->arrNodes['products']) && in_array($objProduct->gid, $this->arrNodes['groups']))
+				if (in_array($objProduct->pid, $this->arrNodes))
 				{
 					break;
 				}
@@ -620,13 +478,7 @@ class ProductTree extends Widget
 				// Add pid to the nodes array
 				if ($objProduct->pid > 0)
 				{
-					$this->arrNodes['products'][] = $objProduct->pid;
-				}
-
-				// Add pid to the nodes array
-				if ($objProduct->gid > 0)
-				{
-					$this->arrNodes['groups'][] = $objProduct->gid;
+					$this->arrNodes[] = $objProduct->pid;
 				}
 
 				$id = $objProduct->pid;
