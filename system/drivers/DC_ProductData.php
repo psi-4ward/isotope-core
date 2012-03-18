@@ -144,6 +144,23 @@ class DC_ProductData extends DC_Table
 	
 	
 	/**
+	 * Insert a new row into a database table
+	 * @param array
+	 */
+	public function create($set=array())
+	{
+		if (!is_array($set))
+		{
+			$set = array();
+		}
+		
+		$set['gid'] = (int) $this->Input->get('gid');
+		
+		parent::create($set);
+	}
+	
+	
+	/**
 	 * Duplicate all child records of a duplicated record
 	 * @param string
 	 * @param int
