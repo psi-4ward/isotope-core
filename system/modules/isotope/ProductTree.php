@@ -169,7 +169,7 @@ class ProductTree extends Widget
 
 
 		$arrTypes = is_array($this->User->iso_product_types) ? $this->User->iso_product_types : array(0);
-		$objProduct = $this->Database->execute("SELECT id FROM tl_iso_products WHERE pid=0 AND language='' AND archive<2" . ($this->User->isAdmin ? '' : " AND type IN ('','" . implode("','", $arrTypes) . "')"));
+		$objProduct = $this->Database->execute("SELECT id FROM tl_iso_products WHERE pid=0 AND language=''" . ($this->User->isAdmin ? '' : " AND type IN ('','" . implode("','", $arrTypes) . "')"));
 
 		while ($objProduct->next())
 		{
@@ -247,7 +247,7 @@ class ProductTree extends Widget
 		$tree = '';
 		$level = $level * 20;
 
-		$objProducts = $this->Database->execute("SELECT id FROM tl_iso_products WHERE language='' AND archive<2 AND pid=".$id);
+		$objProducts = $this->Database->execute("SELECT id FROM tl_iso_products WHERE language='' AND pid=".$id);
 
 		while ($objProducts->next())
 		{
@@ -372,7 +372,7 @@ class ProductTree extends Widget
 		if ($this->variants)
 		{
 			// Check whether there are child records
-			$objNodes = $this->Database->prepare("SELECT id FROM tl_iso_products WHERE pid=? AND language='' AND archive<2")
+			$objNodes = $this->Database->prepare("SELECT id FROM tl_iso_products WHERE pid=? AND language=''")
 									   ->execute($id);
 
 			if ($objNodes->numRows)
