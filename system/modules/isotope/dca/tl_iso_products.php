@@ -185,6 +185,7 @@ $GLOBALS['TL_DCA']['tl_iso_products'] = array
 				'href'				=> 'act=edit',
 				'icon'				=> 'edit.gif',
 			),
+			/*
 			'copy' => array
 			(
 				'label'				=> &$GLOBALS['TL_LANG']['tl_iso_products']['copy'],
@@ -193,6 +194,7 @@ $GLOBALS['TL_DCA']['tl_iso_products'] = array
 				'attributes'		=> 'onclick="Backend.getScrollOffset();"',
 				'button_callback'	=> array('tl_iso_products', 'copyProduct')
 			),
+			*/
 			'delete' => array
 			(
 				'label'				=> &$GLOBALS['TL_LANG']['tl_iso_products']['delete'],
