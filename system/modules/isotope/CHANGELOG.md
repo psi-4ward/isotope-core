@@ -1,7 +1,19 @@
 Isotope eCommerce Changelog
 ===========================
 
-Version 1.3.rc2 (2012-??-??)
+Version 1.3.0 stable (2012-??-??)
+---------------------------------
+
+### Improved
+- PayPal Standard does no longer override the address in debug mode. It could cause issues with international addresses in the sandbox.
+- Use the BYPASS_TOKEN_CHECK constant for postsale script
+
+### Fixed
+- Do not initialize a cart when running the Contao cron job
+- Force type comparison when checking for BE_/FE_USER_LOGGED_IN (fixes #2976)
+
+
+Version 1.3.rc2 (2012-03-19)
 ----------------------------
 
 ### New
@@ -44,6 +56,7 @@ Version 1.3.rc2 (2012-??-??)
 - saveNcreate did not work in ModuleIsotopeSetup (#2933)
 - new product was not created in the selected group
 - possible error message when page trail is empty (#2797)
+- sorting of customer defined and variant attributes was incorrect (#2829)
 
 ### Other
 - Introducing the "provider" directory for complex callback handlers
